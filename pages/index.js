@@ -1,9 +1,10 @@
 import Head from 'next/head';
 import styles from '../styles/Home.module.css';
 import getDemoProps from '../lib/demoProps'
-import { useEffect, useCallback, useMemo, useState } from 'react';
+import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import CreateRoom from '../components/prejoin/createRoom';
 import DailyIframe from '@daily-co/daily-js';
+import { useDeepCompareEffect, useDeepCompareMemo } from 'use-deep-compare';
 
 import {
   ACCESS_STATE_LOBBY,
@@ -12,6 +13,7 @@ import {
   MEETING_STATE_JOINED,
 } from '../constants';
 import VideoTile from '../components/shared/videoTile/videoTile';
+import Chat from '../components/chat/chat';
 
 export const CALL_STATE_READY = 'ready';
 export const CALL_STATE_LOBBY = 'lobby';
@@ -29,8 +31,10 @@ export const CALL_STATE_NOT_ALLOWED = 'not-allowed';
 export const CALL_STATE_AWAITING_ARGS = 'awaiting-args';
 
 export let participantList = [];
+export let chatList = [];
 
 export default function Home({domain, isConfigured, apiKey}) {
+  const audioEl = useRef(null);
   const [room, setRoom] = useState('');
   const [update, setUpdate] = useState(false)
   const [daily, setDaily] = useState(null);
@@ -40,11 +44,49 @@ export default function Home({domain, isConfigured, apiKey}) {
   const [subscribeToTracksAutomatically, setSubscribeToTracksAutomatically] = useState(true);
   const [participants, setParticipants] = useState([]);
   const [creator, setCreator] = useState({});
+  const [audioInput, setAudioInput] = useState([]);
+  const [videoInput, setVideoInput] = useState([]);
+  const [selectedAudio, setSelectedAudio] = useState('');
+  const [selectedVideo, setSelectedVideo] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
   
   // const [url, setUrl] = useState('');
-  console.log("all participants", participants);
  
   const url =  `https://${domain}.daily.co/textdemo`;
+
+
+  useEffect(() => {
+    if (!audioEl) return;
+    audioEl.current.srcObject = new MediaStream();
+  }, [])
+
+  // const trackIds = useDeepCompareMemo(
+  //   () => Object.values(participants.audioTrack).map((t) => t?.persistentTrack?.id),
+  //   [participants]
+  // );
+
+  // useDeepCompareEffect(() => {
+  //   const audio = audioEl.current;
+  //   if (!audio || !audio.srcObject) return;
+
+  //   const stream = audio.srcObject;
+  //   const allTracks = Object.values(participants.tracks);
+  //   console.log("allTracks", allTracks)
+
+  //   // allTracks.forEach((track) => {
+  //   //   const persistentTrack = track?.persistentTrack;
+  //   //   if (persistentTrack) {
+  //   //     persistentTrack.addEventListener(
+  //   //       'ended',
+  //   //       (ev) => stream.removeTrack(ev.target),
+  //   //       { once: true }
+  //   //     );
+  //   //     stream.addTrack(persistentTrack);
+  //   //   }
+  //   // });
+    
+  // }, [participants]);
+
 
 
   /**
@@ -105,6 +147,15 @@ export default function Home({domain, isConfigured, apiKey}) {
     } else {
       daily.leave();
     }
+    setRoom('');
+    setDaily(null);
+    setState(CALL_STATE_READY);
+    setToken("");
+    setRedirectOnLeave(false);
+    setParticipants([]);
+    setCreator({});
+    participantList = [];
+
   }, [daily, state]);
 
 
@@ -157,7 +208,11 @@ export default function Home({domain, isConfigured, apiKey}) {
     if (!daily) return false;
 
     daily.on('access-state-updated', handleAccessStateUpdated);
-    return () => daily.off('access-state-updated', handleAccessStateUpdated);
+    daily.on('app-message', handleNewMessage);
+    return () => {
+      daily.off('access-state-updated', handleAccessStateUpdated);
+      daily.off('app-message', handleNewMessage, handleNewMessage);
+    }
 
   }, [daily, handleAccessStateUpdated])
   
@@ -284,26 +339,34 @@ export default function Home({domain, isConfigured, apiKey}) {
        participantList = newParticipant
         break;
       case 'participant-updated':
-        console.log('participant updated', event)
-        const allParticipants = [...participantList];
-        const index = allParticipants.findIndex((participant) => participant.user_id === event.participant.user_id);
-        if(index !== -1) {
-          allParticipants[index] = event.participant;
-          setParticipants(allParticipants);
-          participantList = allParticipants;
+        console.log('participant updated', event);
+        if(event.participant.local) {
+          setCreator(event.participant)
+        } else {
+          const allParticipants = [...participantList];
+          const index = allParticipants.findIndex((participant) => participant.user_id === event.participant.user_id);
+          if(index !== -1) {
+            allParticipants[index] = event.participant;
+            setParticipants(allParticipants);
+            participantList = allParticipants;
+          }
         }
+        
         setUpdate(!update)
         
 
         break;
       case 'participant-left':
         console.log('participant left', event)
+        const updatedList = participantList.filter(participant => participant.user_id !== event.participant.user_id);
+        setParticipants(updatedList);
+        participantList = updatedList;
         break;
 
       case 'track-started': 
       console.log('track started', event)
-        const videoEl = document.getElementById(event.participant.user_id);
-        videoEl?.srcObject = new MediaStream([event.participant.videoTrack])
+        // const videoEl = document.getElementById(event.participant.user_id);
+        // videoEl?.srcObject = new MediaStream([event.participant.videoTrack])
         break;
       default:
         break;
@@ -344,7 +407,7 @@ export default function Home({domain, isConfigured, apiKey}) {
 
 
 
-  const initDailyObject = async () => {
+  const initDailyObject = async (name) => {
     
     // const url = `https://${domain}.daily.co/${roomID}`;
     console.log('url', url);
@@ -356,6 +419,18 @@ export default function Home({domain, isConfigured, apiKey}) {
     });
     console.log('daily object', call);
     setDaily(call);
+    call.setUserName(name);
+    const { devices } = await call.enumerateDevices();
+    const videoDevices =  devices.filter(device => device.kind === 'videoinput');
+    setVideoInput(videoDevices);
+    setSelectedVideo(videoDevices[0].deviceId);
+    const audioDevices = devices.filter(device => device.kind === 'audioinput');
+    setAudioInput(audioDevices);
+    setSelectedAudio(audioDevices[0].deviceId)
+
+    const { camera, mic, speaker } = await call.getInputDevices();
+    console.log("devices", devices);
+    console.log("cam", camera);
     const dailyRoomInfo = await call.room();
     const { access } = call.accessState();
     console.log("dailyRoomInfo", dailyRoomInfo);
@@ -383,14 +458,14 @@ export default function Home({domain, isConfigured, apiKey}) {
   //   })
   // }
 
-  useEffect(() => {
-    if(!creator.user_id) {
-      return;
-    }
-    const video = document.getElementById(creator.user_id);
-    video.srcObject = new MediaStream([creator.videoTrack]);
-   // if (isChrome92) video.load();
-  }, [creator.user_id]);
+  // useEffect(() => {
+  //   if(!creator.user_id) {
+  //     return;
+  //   }
+  //   const video = document.getElementById(creator.user_id);
+  //   video.srcObject = new MediaStream([creator.videoTrack]);
+  //  // if (isChrome92) video.load();
+  // }, [creator.user_id]);
   
   
 
@@ -427,6 +502,68 @@ export default function Home({domain, isConfigured, apiKey}) {
     getRoomToken(roomInfo.name)
   }
 
+  const hanleVideoToggle = () => {
+    if(!daily) return;
+    daily.setLocalVideo(!creator.video);
+  }
+  const handleAudioToggle = () => {
+    if(!daily) return;
+    daily.setLocalAudio(!creator.audio);
+  }
+
+  const handleScreenShare = () => {
+    if(!daily) return;
+    daily.startScreenShare();
+  }
+  const handleAudioDeviceChange = async(id) => {
+    console.log("audioId", id);
+    setSelectedAudio(id);
+    await daily.setInputDevicesAsync({
+      audioDeviceId: id,
+    });
+
+  }
+
+  const handleVideoDeviceChange = async(id) => {
+    setSelectedVideo(id)
+    await daily.setInputDevicesAsync({
+      videoDeviceId: id,
+    });
+  }
+
+  const uuid = () => {
+    return Math.random().toString(16).slice(2);
+  }
+  const sendMessage = (message) => {
+    if(!daily) return;
+    daily.sendAppMessage({message}, '*');
+    const participants = daily.participants();
+      // Get the sender (local participant) name
+      const sender = participants.local.user_name
+        ? participants.local.user_name
+        : 'Guest';
+      const senderID = participants.local.user_id;
+      const messages = [...chatList];
+      messages.push({sender, senderID,message, id: uuid() })
+      setChatHistory(messages)
+      chatList = messages;
+  }
+
+
+
+  const handleNewMessage = (event) => {
+    if (event?.data?.message?.type) return;
+    const participants = daily.participants();
+    const sender = participants[event.fromId].user_name
+    ? participants[event.fromId].user_name
+    : 'Guest';
+    const messages = [...chatList];
+    console.log("messages", messages);
+    messages.push({sender, senderID: event.fromId,message: event.data.message, id: uuid() })
+    setChatHistory(messages);
+    chatList = messages;
+
+  }
 
   return (
     <div className={styles.container}>
@@ -438,7 +575,11 @@ export default function Home({domain, isConfigured, apiKey}) {
       <header className="text-2xl text-center 
                    text-green-800 border-b-2 
                    border-grey-500">
-      <CreateRoom onCreated={handleRoomCreated} onRoomToken={initDailyObject}/>
+      <CreateRoom 
+      onCreated={handleRoomCreated} 
+      onRoomToken={initDailyObject}
+      handleLeave={leave}
+       daily={daily}/>
     </header>
 
       {/* <main className={styles.main}> */}
@@ -446,7 +587,7 @@ export default function Home({domain, isConfigured, apiKey}) {
        
         <div className="flex h-full">
           <div className='w-2/3 border-2 border-gray-400 relative'>
-            <div className=' w-full h-full'>
+            <div className=' w-full h-96  min-h-full'>
               <div className="grid grid-cols-5 gap-6 ">
                 {participants.map(participant => {
                   return (
@@ -455,6 +596,9 @@ export default function Home({domain, isConfigured, apiKey}) {
                 })}
                 
               </div>
+              <audio autoPlay playsInline ref={audioEl}>
+                <track kind="captions" />
+              </audio>
             </div>
             <div className='absolute bottom-0 left-0 w-full h-24 bg-slate-400'>
               This is sticky fixed Footer.
@@ -462,14 +606,83 @@ export default function Home({domain, isConfigured, apiKey}) {
           </div>
           
             <div className='w-1/3 border-2 border-gray-400'>
-              <div className='grid grid-rows-2 gap-6'>
-                <div>
-                  <VideoTile className="creator" id={creator.user_id} participant={creator} autoPlay/>
+              <div className='grid gap-6'>
+                <div className="" >
+                  {creator.user_id && (
+                      <VideoTile className="creator" 
+                      audioToggle={handleAudioToggle}
+                      toggleScreenShare={handleScreenShare}
+                      videoToggle={hanleVideoToggle} id={creator.user_id} participant={creator} autoPlay/>
+                  )}
                 </div>
-                <div className='h-full'>
-                  Chat Here
-                </div>
+                {state === CALL_STATE_JOINED && (
+                  <div className='flex'>
+                  <div className="mb-3 w-full">
+                        <select
+                          value={selectedVideo}
+                          onChange={(event)=>handleVideoDeviceChange(event.target.value)}
+                         className="form-select appearance-none
+                          block
+                          w-full
+                          px-3
+                          py-1.5
+                          text-base
+                          font-normal
+                          text-gray-700
+                          bg-white bg-clip-padding bg-no-repeat
+                          border border-solid border-gray-300
+                          rounded
+                          transition
+                          ease-in-out
+                          m-0
+                          focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none" aria-label="Default select example">
+                            <option >Select Camera</option>
+                            {videoInput.map(input => {
+                              return (
+                                <option defaultValue={selectedVideo === input.deviceId} value={input.deviceId} key={input.deviceId}>{input.label}</option>
+                              )
+                            })}
+                        </select>
+                      </div>
+                      <div className="mb-3 px-2 w-full">
+                        <select 
+                          onChange={(event)=>handleAudioDeviceChange(event.target.value)}
+                          value={selectedAudio}
+                        className="form-select appearance-none
+                          block
+                          w-full
+                          px-3
+                          py-1.5
+                          text-base
+                          font-normal
+                          text-gray-700
+                          bg-white bg-clip-padding bg-no-repeat
+                          border border-solid border-gray-300
+                          rounded
+                          transition
+                          ease-in-out
+                          m-0
+                          focus:text-gray-700 focus:bg-white focus:border-blue-600 focus:outline-none" aria-label="Default select example">
+                            <option >Select Mic</option>
+                            {audioInput.map(input => {
+                              return (
+                                <option defaultValue={selectedAudio === input.deviceId} value={input.deviceId} key={input.deviceId}>{input.label}</option>
+                              )
+                            })}
+                        </select>
+                      </div>
+                  </div>
+                )}
+                
+                {state === CALL_STATE_JOINED && (
+                  <div className='h-48 max-h-full'>
+                        <Chat
+                        localParticipant={creator}
+                        chatHistory={chatHistory} sendMessage={sendMessage}/>
+                  </div>
+                )}
               </div>
+                
              
             </div>
           </div>
