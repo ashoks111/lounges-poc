@@ -4,7 +4,10 @@ import classNames from 'classnames';
 import Video from "./video";
 import { DEFAULT_ASPECT_RATIO } from "../../../constants";
 
-const VideoTile = ({participant, update, mirrored = true, videoToggle, audioToggle, toggleScreenShare}) => {
+const VideoTile = ({participant, update, mirrored = true,
+  screenShareParticipant ={},
+  activeSpeakerId,
+   isScreenShare=false, sharedMode, videoToggle, audioToggle, toggleScreenShare}) => {
     const videoRef = useRef(null);
     const videoFit = 'contain';
     const aspectRatio =  DEFAULT_ASPECT_RATIO;
@@ -25,7 +28,7 @@ const VideoTile = ({participant, update, mirrored = true, videoToggle, audioTogg
 
     return (
         <div className={cx}>
-            <div className="content">
+            <div className={`content  ${activeSpeakerId === participant.session_id ? 'border-2 border-red-500' : ''}`}>
                 <div className="name">
                     {participant.user_name}
                     {participant.local ? (
@@ -70,11 +73,24 @@ const VideoTile = ({participant, update, mirrored = true, videoToggle, audioTogg
                               </svg>
                             ) }
                           </button>
-                          <button
-                          onClick={toggleScreenShare}
-                          className="bg-white hover:bg-grey text-grey-darkest font-bold py-2 px-2 rounded-full inline-flex items-center">
-                              S
-                          </button>
+                          {(!screenShareParticipant.user_id || screenShareParticipant.user_id === participant.user_id) && (
+                            <button
+                            onClick={toggleScreenShare}
+                            className="bg-white hover:bg-grey text-grey-darkest font-bold py-2 px-2 rounded-full inline-flex items-center">
+                              {sharedMode ? (
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M12 23C18.0751 23 23 18.0751 23 12C23 5.92487 18.0751 1 12 1C5.92487 1 1 5.92487 1 12C1 18.0751 5.92487 23 12 23Z" stroke="currentColor" strokeWidth="2" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round"/>
+                                <circle cx="12" cy="12" r="4" fill="currentColor"/>
+                                </svg>
+                              ) : (
+                                <svg width="16" height="16" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path fillRule="evenodd" clipRule="evenodd" d="M3.6668 17.4165L2.75 18.3333L4.04636 19.6297L19.6297 4.04636L18.3333 2.75L13.3487 7.73463L11.0001 3.66681L8.61857 7.7918L10.0835 7.7918L10.0835 10.9999L5.50014 15.5832V9.1668H7.33347V7.33347H3.6668V17.4165ZM11.9168 9.16653L13.2915 7.7918L11.9168 7.7918V9.16653Z" fill="#E71115"/>
+                                <path d="M7.33347 18.3335V18.1759L9.92592 15.5835H16.5001V9.1668H16.3426L18.1759 7.33347H18.3335V17.4168H14.6668V18.3335H7.33347Z" fill="#E71115"/>
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                          
                       </>
                     ) : null}
                     {!participant.local && !participant.audio && (
@@ -94,7 +110,7 @@ const VideoTile = ({participant, update, mirrored = true, videoToggle, audioTogg
                   participant.video ? (
                     <Video 
                     participantId={participant?.user_id}
-                    videoTrack={participant.videoTrack}
+                    videoTrack={isScreenShare? participant.screenVideoTrack: participant.videoTrack}
                     audioTrack={participant.audioTrack}
                     update={update}
                     local={participant.local}

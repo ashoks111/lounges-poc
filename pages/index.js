@@ -32,6 +32,9 @@ export const CALL_STATE_AWAITING_ARGS = 'awaiting-args';
 
 export let participantList = [];
 export let chatList = [];
+export let screenShareParticipantList = {};
+export let dailyObj = null;
+
 
 export default function Home({domain, isConfigured, apiKey}) {
   const audioEl = useRef(null);
@@ -49,6 +52,9 @@ export default function Home({domain, isConfigured, apiKey}) {
   const [selectedAudio, setSelectedAudio] = useState('');
   const [selectedVideo, setSelectedVideo] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
+  const [isScreenShare, setIsScreenShare] = useState(false);
+  const [screenShareParticipant, setScreenSharePArticipant] = useState({});
+  const [activeSpeakerId, setActiveSpeakerId] = useState('');
   
   // const [url, setUrl] = useState('');
  
@@ -95,7 +101,8 @@ export default function Home({domain, isConfigured, apiKey}) {
    const join = useCallback(
     async (callObject) => {
       setState(CALL_STATE_JOINING);
-      await callObject.join({ subscribeToTracksAutomatically, token, url });
+      await callObject.join({ subscribeToTracksAutomatically: false, token, url });
+
       setState(CALL_STATE_JOINED);
     },
     [token, subscribeToTracksAutomatically, url]
@@ -139,7 +146,7 @@ export default function Home({domain, isConfigured, apiKey}) {
   /**
    * Leave call
    */
-   const leave = useCallback(() => {
+   const leave = () => {
     if (!daily) return;
     // If we're in the error state, we've already "left", so just clean up
     if (state === CALL_STATE_ERROR) {
@@ -155,8 +162,18 @@ export default function Home({domain, isConfigured, apiKey}) {
     setParticipants([]);
     setCreator({});
     participantList = [];
-
-  }, [daily, state]);
+    setAudioInput([]);
+    setVideoInput([]);
+    setSelectedAudio('');
+    setSelectedVideo('');
+    setChatHistory([]);
+    setIsScreenShare(false);
+    setScreenSharePArticipant({});
+    chatList= []; 
+    screenShareParticipantList = {};
+    dailyObj = null;
+    window.location.reload();
+  };
 
 
 
@@ -209,9 +226,13 @@ export default function Home({domain, isConfigured, apiKey}) {
 
     daily.on('access-state-updated', handleAccessStateUpdated);
     daily.on('app-message', handleNewMessage);
+    daily.on('active-speaker-change', handleActiveSpeakerChange);
+      
     return () => {
       daily.off('access-state-updated', handleAccessStateUpdated);
-      daily.off('app-message', handleNewMessage, handleNewMessage);
+      daily.off('app-message', handleNewMessage);
+      daily.off('active-speaker-change', handleActiveSpeakerChange);
+
     }
 
   }, [daily, handleAccessStateUpdated])
@@ -330,6 +351,7 @@ export default function Home({domain, isConfigured, apiKey}) {
 
  const handleNewParticipantsState = useCallback(
   (event = null) => {
+    console.log("daily object in new", event);
     switch (event?.action) {
       case 'participant-joined':
        console.log('participant joined', participants)
@@ -337,9 +359,24 @@ export default function Home({domain, isConfigured, apiKey}) {
        console.log(newParticipant);
        setParticipants(newParticipant);
        participantList = newParticipant
+      
         break;
       case 'participant-updated':
         console.log('participant updated', event);
+        if(screenShareParticipantList.user_id) {
+          if(event.participant.user_id === screenShareParticipantList.user_id) {
+            if(!event.participant.screen) {
+              setIsScreenShare(false);
+              setScreenSharePArticipant({});
+              screenShareParticipantList = {};
+            }
+          }
+        }
+        if(event.participant.screen) {
+          setIsScreenShare(true);
+          setScreenSharePArticipant(event.participant);
+          screenShareParticipantList = event.participant;
+        }
         if(event.participant.local) {
           setCreator(event.participant)
         } else {
@@ -403,23 +440,13 @@ export default function Home({domain, isConfigured, apiKey}) {
       events.forEach((event) =>
         daily.off(event, handleNewParticipantsState)
       );
-  }, [daily, handleNewParticipantsState]);
+  }, [daily, handleNewParticipantsState, update]);
 
 
-
-  const initDailyObject = async (name) => {
-    
-    // const url = `https://${domain}.daily.co/${roomID}`;
-    console.log('url', url);
-    const call = DailyIframe.createCallObject({
-      url,
-      dailyConfig: {
-        experimentalChromeVideoMuteLightOff: true,
-      },
-    });
-    console.log('daily object', call);
-    setDaily(call);
+  const init = async(name) => {
+    const call = dailyObj;
     call.setUserName(name);
+    
     const { devices } = await call.enumerateDevices();
     const videoDevices =  devices.filter(device => device.kind === 'videoinput');
     setVideoInput(videoDevices);
@@ -433,9 +460,28 @@ export default function Home({domain, isConfigured, apiKey}) {
     console.log("cam", camera);
     const dailyRoomInfo = await call.room();
     const { access } = call.accessState();
+    console.log("audio state", call.localAudio());
     console.log("dailyRoomInfo", dailyRoomInfo);
     console.log("access", access);
     preAuth(call);
+  }
+
+  const initDailyObject = () => {
+    
+    // const url = `https://${domain}.daily.co/${roomID}`;
+    console.log('url', url);
+    const call = DailyIframe.createCallObject({
+      url,
+      // audioSource: false,
+      // videoSource: false,
+      dailyConfig: {
+        experimentalChromeVideoMuteLightOff: true,
+      },
+    });
+    console.log('daily object', call);
+    setDaily(call);
+    dailyObj = call;
+    
   }
 
   // const preAuth = async(co, roomID) => {
@@ -513,7 +559,15 @@ export default function Home({domain, isConfigured, apiKey}) {
 
   const handleScreenShare = () => {
     if(!daily) return;
-    daily.startScreenShare();
+    if(isScreenShare) {
+      daily.stopScreenShare();
+      setIsScreenShare(false);
+      setScreenSharePArticipant({});
+      screenShareParticipantList={};
+    } else {
+      daily.startScreenShare();
+    }
+   
   }
   const handleAudioDeviceChange = async(id) => {
     console.log("audioId", id);
@@ -538,6 +592,7 @@ export default function Home({domain, isConfigured, apiKey}) {
     if(!daily) return;
     daily.sendAppMessage({message}, '*');
     const participants = daily.participants();
+    console.log("daily participants", participants);
       // Get the sender (local participant) name
       const sender = participants.local.user_name
         ? participants.local.user_name
@@ -548,6 +603,10 @@ export default function Home({domain, isConfigured, apiKey}) {
       setChatHistory(messages)
       chatList = messages;
   }
+
+  useEffect(() => {
+    initDailyObject();
+  }, [])
 
 
 
@@ -565,6 +624,15 @@ export default function Home({domain, isConfigured, apiKey}) {
 
   }
 
+  const handleActiveSpeakerChange = ({activeSpeaker}) => {
+    setActiveSpeakerId(activeSpeaker?.peerId)
+  }
+
+  const subscribeParticipant = (sessionId) => {
+    daily.updateParticipant(sessionId, {setSubscribedTracks: { audio: true,video: true, screenVideo: true }})
+  }
+
+  console.log("ALl participants", participants);
   return (
     <div className={styles.container}>
       <Head>
@@ -577,7 +645,8 @@ export default function Home({domain, isConfigured, apiKey}) {
                    border-grey-500">
       <CreateRoom 
       onCreated={handleRoomCreated} 
-      onRoomToken={initDailyObject}
+      onRoomToken={init}
+      state={state}
       handleLeave={leave}
        daily={daily}/>
     </header>
@@ -588,7 +657,33 @@ export default function Home({domain, isConfigured, apiKey}) {
         <div className="flex h-full">
           <div className='w-2/3 border-2 border-gray-400 relative'>
             <div className=' w-full h-96  min-h-full'>
-              <div className="grid grid-cols-5 gap-6 ">
+              {isScreenShare ? (<div className="grid grid-cols-1 gap-6 ">
+              <VideoTile
+              isScreenShare={true}
+               key={screenShareParticipant.user_id} update={update} participant={screenShareParticipant} mirrored={false} />
+                
+              </div>) : (
+                <div className="grid grid-cols-5 gap-6 ">
+                {participants.map(participant => {
+                  return (
+                    <VideoTile key={participant.user_id}
+                    activeSpeakerId={activeSpeakerId}
+                     update={update} 
+                    participant={participant}
+                     mirrored={false} />
+                  )
+                })}
+                
+              </div>
+              )}
+              
+              <audio autoPlay playsInline ref={audioEl}>
+                <track kind="captions" />
+              </audio>
+            </div>
+            <div className='absolute bottom-0 left-0 w-full h-24 bg-slate-400'>
+              {isScreenShare ? (
+                <div className="grid grid-cols-5 gap-6 ">
                 {participants.map(participant => {
                   return (
                     <VideoTile key={participant.user_id} update={update} participant={participant} mirrored={false} />
@@ -596,12 +691,15 @@ export default function Home({domain, isConfigured, apiKey}) {
                 })}
                 
               </div>
-              <audio autoPlay playsInline ref={audioEl}>
-                <track kind="captions" />
-              </audio>
-            </div>
-            <div className='absolute bottom-0 left-0 w-full h-24 bg-slate-400'>
-              This is sticky fixed Footer.
+              ): <div className='flex'>
+                  {
+                    participants.map(participant => {
+                      return (
+                        <div key={participant.user_id}><span>{participant.user_name}</span><button onClick={()=>subscribeParticipant(participant.session_id)}>Accept</button></div>
+                      )
+                    })
+                  }
+                </div>}
             </div>
           </div>
           
@@ -610,8 +708,10 @@ export default function Home({domain, isConfigured, apiKey}) {
                 <div className="" >
                   {creator.user_id && (
                       <VideoTile className="creator" 
+                      sharedMode={isScreenShare}
                       audioToggle={handleAudioToggle}
                       toggleScreenShare={handleScreenShare}
+                      screenShareParticipant={screenShareParticipant}
                       videoToggle={hanleVideoToggle} id={creator.user_id} participant={creator} autoPlay/>
                   )}
                 </div>

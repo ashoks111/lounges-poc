@@ -1,7 +1,7 @@
 import { useState } from "react";
 import PropTypes from 'prop-types';
 
-export const CreateRoom = ({onCreated, onRoomToken, daily, handleLeave}) => {
+export const CreateRoom = ({onCreated, onRoomToken, daily, state, handleLeave}) => {
     const [name, setName] = useState();
     const [fetching, setFetching] = useState(false);
     const [error, setError] = useState(false);
@@ -64,7 +64,7 @@ export const CreateRoom = ({onCreated, onRoomToken, daily, handleLeave}) => {
               </div> */}
               <div className="w-full md:w-4/6 flex px-3 mb-6 md:mb-0">
                 {
-                  daily ? (
+                  state === 'joined' ? (
                     
                   <button 
                     className="bg-red-600 mt-2 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
