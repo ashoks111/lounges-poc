@@ -363,6 +363,8 @@ export const Button = forwardRef(
   }
 );
 
+Button.displayName = "Button";
+
 Button.propTypes = {
   children: PropTypes.node,
   className: PropTypes.string,

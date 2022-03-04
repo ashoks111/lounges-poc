@@ -7,7 +7,7 @@ import { DEFAULT_ASPECT_RATIO } from "../../../constants";
 const VideoTile = ({participant, update, mirrored = true,
   screenShareParticipant ={},
   activeSpeakerId,
-   isScreenShare=false, sharedMode, videoToggle, audioToggle, toggleScreenShare}) => {
+   isScreenShare=false, sharedMode, videoToggle, audioToggle, toggleScreenShare, state}) => {
     const videoRef = useRef(null);
     const videoFit = 'contain';
     const aspectRatio =  DEFAULT_ASPECT_RATIO;
@@ -73,7 +73,7 @@ const VideoTile = ({participant, update, mirrored = true,
                               </svg>
                             ) }
                           </button>
-                          {(!screenShareParticipant.user_id || screenShareParticipant.user_id === participant.user_id) && (
+                          {((!screenShareParticipant.user_id || screenShareParticipant.user_id === participant.user_id)&& state=== 'joined') && (
                             <button
                             onClick={toggleScreenShare}
                             className="bg-white hover:bg-grey text-grey-darkest font-bold py-2 px-2 rounded-full inline-flex items-center">
@@ -107,7 +107,7 @@ const VideoTile = ({participant, update, mirrored = true,
                     )}
                 </div>
                 {
-                  participant.video ? (
+                  (participant.video || participant.screen) ? (
                     <Video 
                     participantId={participant?.user_id}
                     videoTrack={isScreenShare? participant.screenVideoTrack: participant.videoTrack}

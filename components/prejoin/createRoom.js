@@ -40,10 +40,14 @@ export const CreateRoom = ({onCreated, onRoomToken, daily, state, handleLeave}) 
       onRoomToken(name, false)
     }
 
+    const startCam = () => {
+      daily.startCamera();
+    }
+
     return (
-        <div>
+        <div className="w-full md:w-auto flex justify-center">
              
-              <div className="flex flex-wrap  mb-2">
+              {/* <div className=""> */}
               {/* <div className="w-full md:w-1/6 px-2 mb-2 md:mb-0">
                 <button 
                   onClick={handleRoomCreate}
@@ -62,34 +66,42 @@ export const CreateRoom = ({onCreated, onRoomToken, daily, state, handleLeave}) 
                   onChange={(event) =>handleRoomIdChange(event.target.value)}
                   placeholder="textdemo" />
               </div> */}
-              <div className="w-full md:w-4/6 flex px-3 mb-6 md:mb-0">
+              {/* <div className="w-full md:w-4/6 flex px-3 mb-6 md:mb-0"> */}
                 {
                   state === 'joined' ? (
                     
                   <button 
-                    className="bg-red-600 mt-2 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                    className="block mb-4 mt-4 px-3 py-2 text-xs font-bold no-underline hover:shadow bg-red-600 text-white rounded"
                     onClick={handleLeave}>
                       Leave
                   </button>) : (
-                  <><div className="w-full md:w-4/6  px-3">
-                  <label className="block uppercase tracking-wide text-gray-700 text-xs font-bold mb-2" htmlFor="roomID">
+                  <><>
+                  {/* <label className="block uppercase tracking-wide text-gray-700 text-xs font-bold mb-2" htmlFor="roomID">
                     Display Name
-                  </label>
-                  <input className="appearance-none block w-full bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
+                  </label> */}
+                  <input className="appearance-none block w-full mb-4 mt-4 mr-4 bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
                     id="roomID"
                     type="text"
                     onChange={(event) =>handleDisplayName(event.target.value)}
                     placeholder="Enter display Name" />
-                </div>
+                </>
+                
                 <button 
-                    className="bg-blue-500 mt-2 hover:bg-blue-700 text-white font-bold py-2 px-2 rounded"
+                    className="block mb-4 mt-4  ml-4 px-3 py-2 text-xs w-36 font-bold no-underline hover:shadow bg-green-600 text-white"
                     onClick={() => handleWatchNow()}>
                       Join Now
-                  </button> </>)
+                  </button>
+
+                  <button 
+                    className="block mb-4 mt-4 px-3 ml-4  py-2 text-xs w-36 font-bold no-underline hover:shadow bg-green-600 text-white"
+                    onClick={() => startCam()}>
+                      Test Your device
+                  </button>
+                   </>)
                 }
                 
-              </div>
-        </div>
+              {/* </div> */}
+        {/* </div> */}
             {/* <label htmlFor="roomId" className="block text-sm font-medium text-gray-700">Room ID</label> */}
             {/* <div className="mt-1 relative rounded-md shadow-sm"> */}
                

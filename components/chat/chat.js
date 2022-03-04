@@ -11,7 +11,7 @@ const Chat = ({chatHistory, sendMessage, localParticipant}) => {
       }, [chatHistory?.length]);
     return (
         <>
-            <div className="messages-container overflow-auto h-36" ref={chatWindowRef}>
+            <div className="messages-container overflow-auto h-[14rem]" ref={chatWindowRef}>
         {chatHistory.map((chatItem) => (
           <div
             className={isLocalUser(chatItem.senderID) ? 'message local' : 'message'}
@@ -27,15 +27,16 @@ const Chat = ({chatHistory, sendMessage, localParticipant}) => {
         sendMessage(newMessage);
         setNewMessage('');
       }}>
-        <footer className="chat-footer">
+        <footer className="chat-footer ">
           <input
+          className="appearance-none block w-full mt-4 mb-4 mr-4 bg-gray-200 text-gray-700 border border-gray-200 rounded py-3 px-4 leading-tight focus:outline-none focus:bg-white focus:border-gray-500"
             value={newMessage}
             placeholder="Type message here"
             variant="transparent"
             onChange={(e) => setNewMessage(e.target.value)}
           />
           <button
-            className="send-button bg-slate-200"
+            className="block mb-4 mt-4 px-3 py-2 text-xs  font-bold no-underline hover:shadow bg-green-600 text-white"
             variant="transparent"
             disabled={!newMessage}
             type="submit"
@@ -78,7 +79,6 @@ const Chat = ({chatHistory, sendMessage, localParticipant}) => {
         .chat-footer {
           flex-flow: row nowrap;
           box-sizing: border-box;
-          padding: var(--spacing-xxs) 0;
           display: flex;
           position: relative;
           border-top: 1px solid var(--gray-light);

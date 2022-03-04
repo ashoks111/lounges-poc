@@ -401,7 +401,40 @@ export default function Home({domain, isConfigured, apiKey}) {
         break;
 
       case 'track-started': 
-      console.log('track started', event)
+      console.log('track started', event);
+        if(!event.participant.local) {
+          if(event.track.kind === 'audio') {
+            const audio = audioEl.current;
+            if (!audio || !audio.srcObject) return;
+            const stream = audio.srcObject;
+            event.track.addEventListener(
+              'ended',
+              (ev) => stream.removeTrack(ev.target),
+              { once: true }
+            );
+            stream.addTrack(event.track);
+          }
+        }
+
+     //   const audio = audioEl.current;
+  //   if (!audio || !audio.srcObject) return;
+
+  //   const stream = audio.srcObject;
+  //   const allTracks = Object.values(participants.tracks);
+  //   console.log("allTracks", allTracks)
+
+  //   // allTracks.forEach((track) => {
+  //   //   const persistentTrack = track?.persistentTrack;
+  //   //   if (persistentTrack) {
+  //   //     persistentTrack.addEventListener(
+  //   //       'ended',
+  //   //       (ev) => stream.removeTrack(ev.target),
+  //   //       { once: true }
+  //   //     );
+  //   //     stream.addTrack(persistentTrack);
+  //   //   }
+  //   // });
+    
         // const videoEl = document.getElementById(event.participant.user_id);
         // videoEl?.srcObject = new MediaStream([event.participant.videoTrack])
         break;
@@ -634,15 +667,13 @@ export default function Home({domain, isConfigured, apiKey}) {
 
   console.log("ALl participants", participants);
   return (
-    <div className={styles.container}>
+    <div className='w-full bg-["#E5E5E5"]'>
       <Head>
         <title>Lounges App</title>
         <meta name="description" content="Lounges have fun" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
-      <header className="text-2xl text-center 
-                   text-green-800 border-b-2 
-                   border-grey-500">
+      <header className="flex flex-wrap items-center justify-center align-center px-12 h-[10vh] mb-1 relative">
       <CreateRoom 
       onCreated={handleRoomCreated} 
       onRoomToken={init}
@@ -654,8 +685,8 @@ export default function Home({domain, isConfigured, apiKey}) {
       {/* <main className={styles.main}> */}
         
        
-        <div className="flex h-full">
-          <div className='w-2/3 border-2 border-gray-400 relative'>
+        <div className="w-full flex h-[90vh]  flex-wrap md:h-[89vh] pt-1">
+          <div className='w-2/3  bg-appgrey-vdark border-[1px] border-appgrey-mid relative'>
             <div className=' w-full h-96  min-h-full'>
               {isScreenShare ? (<div className="grid grid-cols-1 gap-6 ">
               <VideoTile
@@ -663,7 +694,7 @@ export default function Home({domain, isConfigured, apiKey}) {
                key={screenShareParticipant.user_id} update={update} participant={screenShareParticipant} mirrored={false} />
                 
               </div>) : (
-                <div className="grid grid-cols-5 gap-6 ">
+                <div className={`${participants.length === 0 ? 'flex' : 'grid' } grid-cols-${participants.length=== 0 ? '0' : participants.length ===1 ? '1' : '5'}  gap-6 align-middle justify-center`}>
                 {participants.map(participant => {
                   return (
                     <VideoTile key={participant.user_id}
@@ -673,15 +704,18 @@ export default function Home({domain, isConfigured, apiKey}) {
                      mirrored={false} />
                   )
                 })}
+                {
+                  participants.length === 0 && (
+                    <div className='justify-center align-middle text-center text-white'>No one has joined your Lounge yet</div>
+                  )
+                }
                 
               </div>
               )}
               
-              <audio autoPlay playsInline ref={audioEl}>
-                <track kind="captions" />
-              </audio>
+              
             </div>
-            <div className='absolute bottom-0 left-0 w-full h-24 bg-slate-400'>
+            <div className='absolute bottom-0 left-0 w-full h-24 bg-black'>
               {isScreenShare ? (
                 <div className="grid grid-cols-5 gap-6 ">
                 {participants.map(participant => {
@@ -695,7 +729,14 @@ export default function Home({domain, isConfigured, apiKey}) {
                   {
                     participants.map(participant => {
                       return (
-                        <div key={participant.user_id}><span>{participant.user_name}</span><button onClick={()=>subscribeParticipant(participant.session_id)}>Accept</button></div>
+                        <div key={participant.user_id}>
+                        {!participant.tracks?.audio?.subscribed &&
+                        (<div key={participant.user_id} className="ml-1">
+                        <span className=' mb-4 mt-4 px-3 py-2 text-xs font-bold text-white'>{participant.user_name}</span>
+                      <button  className="block mb-4 mt-4 px-3 py-2 text-xs font-bold no-underline hover:shadow bg-green-600 text-white" onClick={()=>subscribeParticipant(participant.session_id)}>Accept</button></div>)
+                        }
+                        
+                        </div>
                       )
                     })
                   }
@@ -703,13 +744,14 @@ export default function Home({domain, isConfigured, apiKey}) {
             </div>
           </div>
           
-            <div className='w-1/3 border-2 border-gray-400'>
-              <div className='grid gap-6'>
+            <div className='w-1/3 bg-appgrey-vdark border-[1px] border-appgrey-mid'>
+              <div className='grid gap-2'>
                 <div className="" >
                   {creator.user_id && (
                       <VideoTile className="creator" 
                       sharedMode={isScreenShare}
                       audioToggle={handleAudioToggle}
+                      state={state}
                       toggleScreenShare={handleScreenShare}
                       screenShareParticipant={screenShareParticipant}
                       videoToggle={hanleVideoToggle} id={creator.user_id} participant={creator} autoPlay/>
@@ -786,6 +828,9 @@ export default function Home({domain, isConfigured, apiKey}) {
              
             </div>
           </div>
+          <audio autoPlay playsInline ref={audioEl}>
+                <track kind="captions" />
+              </audio>
           
           
 

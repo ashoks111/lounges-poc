@@ -55,9 +55,9 @@ export const Video = ({ participantId, videoTrack,audioTrack, local, update, ref
       console.log('v2',video, videoTrack)
       if (!video || !videoTrack) return;
       const stream = new MediaStream([videoTrack]);
-      if(!local && audioTrack) {
-        stream.addTrack(audioTrack);
-      }
+      // if(!local && audioTrack) {
+      //   stream.addTrack(audioTrack);
+      // }
       video.srcObject = stream;
      // if (isChrome92) video.load();
     }, [refElement, videoTrack, update]);
